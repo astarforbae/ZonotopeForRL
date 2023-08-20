@@ -5,16 +5,15 @@ from torch import nn, optim
 from torch.nn import functional as func
 
 from .reply_buffer import ReplayBuffer
-from .agent import AbstractAgent
+from .models import Actor, Critic
 
+from utils.read_yaml import *
 
-
-
-
-class ZonotopeAgent(AbstractAgent):
+class ZonotopeAgent:
     """
-    :keyword
+    Agent using DDPG training and use zonotope to divide the state space
     """
+
     def __init__(self, env, num_interval=10, num_episodes=100, learning_rate=0.1, discount_factor=0.99,
                  replay_capacity=10000, batch_size=32):
         super(ZonotopeAgent, self).__init__(env)
@@ -28,6 +27,7 @@ class ZonotopeAgent(AbstractAgent):
 
     def generate_zonotope_mapping(self, observation_space, num_interval):
         """
+        划分zonotope，并使用
         :param observation_space: 状态空间
         :param num_interval: 划分的粒度
         :return:
