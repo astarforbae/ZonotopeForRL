@@ -1,5 +1,10 @@
 import argparse
+
+import torch
+
 from core import train
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == '__main__':
     # 环境列表
