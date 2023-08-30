@@ -5,7 +5,7 @@ from core.zonotope import ZonotopeAgent
 
 
 def train(args):
-    env = gym.make(args.env_name, render_mode=args.render_mode)
+    env = gym.make(args.env_name)
 
     env.reset()
     model = ZonotopeAgent(env)
