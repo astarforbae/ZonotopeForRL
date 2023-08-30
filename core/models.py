@@ -1,12 +1,6 @@
-import os
-import time
-import random
-import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
 
 
 class Actor(nn.Module):
@@ -14,25 +8,29 @@ class Actor(nn.Module):
     Deep Deterministic Policy Gradient (DDPG) - Actor
     :param 
     """
-    def __init__(self, input_size, hidden_size, output_size):
+
+    def __init__(self, input_size, hidden_size, output_size, num_hidden=3):
         super(Actor, self).__init__()
-        larger_weight = 0.01
+        larger_weight = 1
         self.input_size = input_size
         self.output_size = output_size
-        as_dim = int(input_size / 2)
         # network arch
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear1.weight.data.normal_(0, larger_weight)
-        self.linear1.bias.data.zero_()
-        self.linear2 = nn.Linear(hidden_size, hidden_size)
-        self.linear2.weight.data.normal_(0, larger_weight)
-        self.linear2.bias.data.zero_()
-        self.linear3 = nn.Linear(hidden_size, hidden_size)
-        self.linear3.weight.data.normal_(0, larger_weight)
-        self.linear3.bias.data.zero_()
-        self.linear4 = nn.Linear(hidden_size, hidden_size)
-        self.linear4.weight.data.normal_(0, larger_weight)
-        self.linear4.bias.data.zero_()
+        layers = [
+            nn.Linear(input_size, hidden_size),
+            nn.ReLU()
+        ]
+
+        for _ in range(num_hidden):
+            layers.extend([
+                nn.Linear(hidden_size, hidden_size),
+                nn.Tanh()
+            ])
+        layers.append(nn.Linear(hidden_size, output_size))
+        self.model = nn.Sequential(*layers)
+        for layer in self.model:
+            if isinstance(layer, nn.Linear):
+                layer.weight.data.normal_(0, larger_weight)
+                layer.bias.data.zero_()
 
     def forward(self, x):
         action, _ = self.fw_imp(x)
@@ -59,19 +57,17 @@ class Actor(nn.Module):
         :param s:
         :return:
         """
-        x = torch.relu(self.linear1(s))
-        x = torch.relu(self.linear2(x))
-        x = torch.relu(self.linear3(x))
-        x = torch.relu(self.linear4(x))
-        # ?
-        b = torch.Tensor([1.0, 2.0, 1.0, 10.0, 1.0])
-        x = x * b
+        x = self.model(s)
+        # b = torch.Tensor([1.0, 2.0, 1.0, 10.0, 1.0])
+        # x = x * b
         return x
 
 
 class Critic(nn.Module):
     """
-
+    :param
+    :param
+    :param
     """
 
     def __init__(self, input_size, hidden_size, output_size):
@@ -88,5 +84,3 @@ class Critic(nn.Module):
         x = F.relu(self.linear3(x))
         x = self.linear4(x)
         return x
-
-
