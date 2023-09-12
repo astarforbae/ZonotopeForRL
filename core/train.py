@@ -1,7 +1,7 @@
 # main function
 import gym
 
-from core.zonotope import ZonotopeAgent
+from core.agent import ZonotopeAgent
 
 
 def train(args):

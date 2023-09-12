@@ -2,9 +2,13 @@
 #                                author: yy                                    #
 #                                                                              #
 ################################################################################
-
-class KDTreeNode:
-    pass
+from scipy.spatial import cKDTree
+class KDTreeManager:
+    """
+    KDTree 建立索引
+    """
+    def __init__(self, center_vec):
+        self.ckd_tree = cKDTree()
 
 class DivideTools:
     """

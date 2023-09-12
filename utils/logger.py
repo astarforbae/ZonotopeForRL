@@ -26,7 +26,7 @@ def get_logger(tag='default', log_level=0):
 
 class Logger(object):
     """
-
+    日志类
     """
 
     def __init__(self, vanilla_logger, log_dir, log_level=0):
