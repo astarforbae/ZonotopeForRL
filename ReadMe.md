@@ -42,14 +42,14 @@
 
 #### 工具
 
-- [x] logger工具类
+- [ ] logger工具类 -> tensorboard
 - [ ] yaml 读取文件（updating）
-- [ ] tensorboard包装类
-- [ ] config类配置
+- [ ] tensorboard包装类（updating）
+- [ ] config / json类配置（updating）
 
 #### misc
-- [ ] 统一requirement.txt
-- [ ] 工具类注释补全
+- [x] 统一requirement.txt
+- [x] 工具类注释补全
 - [ ] zonotope分出来
 
 #### 测试
@@ -88,3 +88,11 @@
 9.4号更新：
 
 阅读Tyler1+和A2I，更改core，实现test
+
+
+
+9.10号更新
+
+- 通过提高划分精度解决lineprog问题
+- 
+- 

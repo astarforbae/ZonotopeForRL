@@ -7,14 +7,17 @@
 from .normalizer import *
 import argparse
 import torch
-import os
+from pathlib import Path
+
 
 class Config:
     DEVICE = torch.device('cuda')
     NOISY_LAYER_SID = 0.1
     DEFAULT_REPLAY = 'replay'
     PRIORITIZED_REPLAY = 'prioritized_replay'
-    SCRIPT_PATH = os.path.split(os.path.realpath(__file__))[0]
+    PROJECT_PATH = Path(__file__).parent if '__file__' in globals() else Path().cwd()
+    PT_FOLDER = PROJECT_PATH.parent / 'pt'
+    LOG_FOLDER = PROJECT_PATH.parent / 'log'
 
     def __init__(self):
         self.parser = argparse.ArgumentParser()

@@ -4,20 +4,15 @@
 #                                                                              #
 #                                                                              #
 ################################################################################
-import random
 
-import numpy as np
-import torch
 from scipy.optimize import linprog
 from torch import nn, optim
-from torch.nn import functional as func
 
-from .reply_buffer import ReplayBuffer
-from .models import Actor, Critic
-from .zonotope import is_in_zonotope
-
-from utils.config import Config
 from utils.logger import *
+from utils.misc import get_default_pt_dir
+from .models import Actor, Critic
+from .reply_buffer import ReplayBuffer
+from .zonotope import is_in_zonotope
 
 
 class ZonotopeAgent:
@@ -28,7 +23,7 @@ class ZonotopeAgent:
     def __init__(self,
                  env,
                  num_interval=10,
-                 num_episodes=100,
+                 num_episodes=500,
                  max_steps=15000,
                  actor_lr=0.1,
                  critic_lr=0.1,
@@ -89,10 +84,10 @@ class ZonotopeAgent:
         """
         实现模型的保存
         """
-        pt_name0 = os.path.join("../pt/actor.pt")
-        pt_name1 = os.path.join("../pt/critic.pt")
-        pt_name2 = os.path.join("../pt/target_actor.pt")
-        pt_name3 = os.path.join("../pt/target_critic.pt")
+        pt_name0 = get_default_pt_dir('actor.pt')
+        pt_name1 = get_default_pt_dir("critic.pt")
+        pt_name2 = get_default_pt_dir("target_actor.pt")
+        pt_name3 = get_default_pt_dir("target_critic.pt")
         torch.save(self.actor.state_dict(), pt_name0)
         torch.save(self.critic.state_dict(), pt_name1)
         torch.save(self.target_actor.state_dict(), pt_name2)
@@ -103,10 +98,10 @@ class ZonotopeAgent:
         实现4个模型的加载
         """
 
-        pt_name0 = "../pt/actor.pt"
-        pt_name1 = "../pt/critic.pt"
-        pt_name2 = "../pt/target_actor.pt"
-        pt_name3 = "../pt/target_critic.pt"
+        pt_name0 = os.path.join(Config.PT_FOLDER, "actor.pt")
+        pt_name1 = os.path.join(Config.PT_FOLDER, "critic.pt")
+        pt_name2 = os.path.join(Config.PT_FOLDER, "target_actor.pt")
+        pt_name3 = os.path.join(Config.PT_FOLDER, "target_critic.pt")
         self.actor.load_state_dict(torch.load(pt_name0))
         self.critic.load_state_dict(torch.load(pt_name1))
         self.target_actor.load_state_dict(torch.load(pt_name2))
@@ -169,7 +164,6 @@ class ZonotopeAgent:
             # 判断状态是否在zonotope内部
             if is_in_zonotope(state, center_vec, generate_matrix):
                 return center_vec, generate_matrix
-        print(1)
         return zonotope_mapping[0]
 
     def update_egreed(self):
@@ -201,8 +195,9 @@ class ZonotopeAgent:
         # 经验池回放
         if len(self.memory) < self.batch_size:
             return
-        s0, a0, r, s1 = self.memory.sample(self.batch_size)
-
+        p = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
+        print(p)
+        s0, a0, r, s1, _ = p
         s0 = torch.tensor(s0, dtype=torch.float)
         a0 = torch.tensor(a0, dtype=torch.float)
         r = torch.tensor(r, dtype=torch.float).view(self.batch_size, -1)
@@ -279,34 +274,33 @@ class ZonotopeAgent:
             return fail == 0
 
     def train(self, terminate_pre=True):
+        self.logger.lazy_init_writer()
         for episode in range(self.num_episodes):
             s0 = self.env.reset()
             self.update_egreed()
-            # self.env.render()
-            tot_reward = 0
             step_size = 0
             episode_reward = 0
             for step in range(self.max_steps):
                 if np.random.rand() < self.e_greedy:
-                    a0 = [(np.random.rand() - 0.5) * 2]  # ?
+                    a0 = [(np.random.rand() - 0.5) * 2]  # e_greedy 比较小的情况进行一定的探索
                 else:
                     a0 = self.get_action(s0)
                 s1, r, done, _ = self.env.step(a0)
                 step_size += 1
-                # next_abs =
-                # agent.put
+                self.memory.push(s0, a0, r, s1, done)
                 episode_reward += r
                 s0 = s1
-                # abs = next_abs
                 if step % self.learn_iter:  # 更新
                     self.step()
 
                 if done:  # 结束一个轮次
                     break
-            if episode % self.save_iter:
+            if episode % self.save_iter == 0:
                 self.save()
             self.reward_list.append(episode_reward)
-            # TODO logger print
+            self.logger.info(f'Episode: {episode}, Cumulative_Reward: {episode_reward}')
+            self.logger.add_scalar('Cumulative Reward', episode_reward, episode)
+
             if terminate_pre and episode >= 500:
                 res = self.eval_model()
                 print(res)

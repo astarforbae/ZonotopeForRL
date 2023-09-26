@@ -3,3 +3,5 @@
 log/
 
 pt/
+
+**/__pycache__/

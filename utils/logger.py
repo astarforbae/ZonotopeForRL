@@ -6,7 +6,7 @@
 ################################################################################
 import logging
 
-from torch.utils.tensorboard import SummaryWriter
+from tensorboardX import SummaryWriter
 
 from .misc import *
 
@@ -21,7 +21,7 @@ def get_logger(tag='default', log_level=0):
         fh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s: %(message)s'))
         fh.setLevel(logging.INFO)
         logger.addHandler(fh)
-    return Logger(logger, get_default_log_dir('ddpg'), log_level)
+    return Logger(logger, './log/ddpg', log_level)
 
 
 class Logger(object):
@@ -40,7 +40,7 @@ class Logger(object):
         self.log_dir = log_dir
 
     def lazy_init_writer(self):
-        if self.writer is not None:
+        if self.writer is None:
             self.writer = SummaryWriter(self.log_dir)
 
     @staticmethod
@@ -75,3 +75,4 @@ class Logger(object):
         if step is None:
             step = self.get_step(tag)
         self.writer.add_histogram(tag, values, step)
+
