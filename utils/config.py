@@ -7,13 +7,17 @@
 from .normalizer import *
 import argparse
 import torch
+from pathlib import Path
 
 
 class Config:
-    DEVICE = torch.device('cpu')
+    DEVICE = torch.device('cuda')
     NOISY_LAYER_SID = 0.1
     DEFAULT_REPLAY = 'replay'
     PRIORITIZED_REPLAY = 'prioritized_replay'
+    PROJECT_PATH = Path(__file__).parent if '__file__' in globals() else Path().cwd()
+    PT_FOLDER = PROJECT_PATH.parent / 'pt'
+    LOG_FOLDER = PROJECT_PATH.parent / 'log'
 
     def __init__(self):
         self.parser = argparse.ArgumentParser()
@@ -36,8 +40,6 @@ class Config:
         self.use_gae = False
         self.gae_tau = 1.0
         self.target_network_mix = 0.001
-        self.state_normalizer = RescaleNormalizer()
-        self.reward_normalizer = RescaleNormalizer()
         self.min_memory_size = None
         self.max_steps = 0
         self.rollout_length = None

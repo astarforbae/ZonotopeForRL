@@ -58,6 +58,15 @@ def get_default_log_dir(name):
     return './log/%s-%s' % (name, get_time_str())
 
 
+def get_default_pt_dir(name):
+    """
+    Get the name of the pt model dir
+    :param name: the name parameter, usually is  actor/critic
+    :return:
+    """
+    return './pt/%s-%s' % (get_time_str(), name)
+
+
 def mkdir(path):
     """
     Make a new dir according to the path
@@ -90,6 +99,7 @@ def random_sample(indices, batch_size):
     if r:
         yield indices[-r:]
 
+
 def is_plain_type(x):
     """
     Check the type of the x, if it is a plain type return True
@@ -100,4 +110,3 @@ def is_plain_type(x):
         if isinstance(x, t):
             return True
     return False
-

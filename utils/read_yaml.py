@@ -9,7 +9,7 @@ class ConfigManager:
     def __init__(self, config_path):
         with open(config_path, 'r') as stream:
             try:
-                self.config = yaml.safe_load()
+                self.config = yaml.safe_load(stream)
             except yaml.YAMLError as e:
                 print(e)
                 self.config = {}

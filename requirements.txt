@@ -7,3 +7,7 @@ gym~=0.15.7
 yaml~=0.2.5
 pyyaml~=6.0
 baselines~=0.1.6
+numba~=0.56.4
+pytest~=7.2.2
+hypothesis~=6.29.3
+tensorboardx~=2.2
