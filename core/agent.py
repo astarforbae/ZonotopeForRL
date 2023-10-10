@@ -2,17 +2,15 @@
 #                                author: yy                                    #
 #                                agent.py                                      #
 #                                                                              #
-#                                                                              #
 ################################################################################
 
-from scipy.optimize import linprog
 from torch import nn, optim
 
 from utils.logger import *
 from utils.misc import get_default_pt_dir
 from .models import Actor, Critic
 from .reply_buffer import ReplayBuffer
-from .zonotope import is_in_zonotope
+from .zonotope import generate_zonotope_mapping, to_abstract
 
 
 class ZonotopeAgent:
@@ -69,8 +67,8 @@ class ZonotopeAgent:
         self.critic = Critic(critic_input_size, hidden_layer_size, critic_output_size)
         self.target_critic = Critic(critic_input_size, hidden_layer_size, critic_output_size)
         self.critic_optim = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
-        # zonotope
-        self.zonotope_mapping = self.generate_zonotope_mapping(env.observation_space, num_interval)
+        # zonotope 划分
+        self.zonotope_mapping = generate_zonotope_mapping(env.observation_space, num_interval)
         # TODO: divide_tools
         self.divide_tools = None
         # TODO: zonotope data structure
@@ -107,65 +105,6 @@ class ZonotopeAgent:
         self.target_actor.load_state_dict(torch.load(pt_name2))
         self.target_critic.load_state_dict(torch.load(pt_name3))
 
-    def generate_zonotope_mapping(self, observation_space, num_interval):
-        """
-        TODO(yy): 移植到dividetools
-        划分zonotope，并使用
-        :param observation_space: 状态空间
-        :param num_interval: 划分的粒度
-        :return:
-        """
-        # 创建空的 zonotope_mapping 字典
-        zonotope_mapping = {}
-        step_sizes = (observation_space.high - observation_space.low) / (2 * num_interval)
-        split_points = [np.linspace(observation_space.low[i] + step_sizes[i], observation_space.high[i] - step_sizes[i],
-                                    num=num_interval, dtype=np.float64)
-                        for i in range(len(observation_space.low))]
-
-        # 生成多维网格点
-        grid = np.meshgrid(*split_points, indexing='ij')
-
-        # 遍历所有网格点，生成 zonotope，并添加到字典中
-        for i in range(grid[0].size):
-            center_vec = np.array([g.ravel()[i] for g in grid])  # Zonotope 的中心向量
-            generate_matrix = np.diag(step_sizes)  # 生成矩阵为对角阵，对角线元素为每个区间的一半长度
-            zonotope_mapping[i] = (center_vec, generate_matrix)
-
-        return zonotope_mapping
-
-    def is_in_zonotope(self, state, center_vec, generate_matrix):
-        """
-        TODO:迁移到divide_tools中，结合KDTREE
-        判断是否在zonotope中
-        :param generate_matrix:
-        :param center_vec:
-        :param state:
-        :return:
-        """
-
-        c = np.ones(generate_matrix.shape[1])  # 目标
-        A_ub = np.vstack((generate_matrix.T, -generate_matrix.T))  # 不等式上下界限
-        b_ub = np.ones(2 * generate_matrix.shape[1])  #
-        b_eq = state - center_vec  # Right-hand side of equalities
-        res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=generate_matrix, b_eq=b_eq, method='highs', options={'tol': 1e-5})
-
-        return res.success
-
-    def find_zonotope(self, state, zonotope_mapping):
-        """
-        TODO:使用空间索引加快搜索进度
-        find id of zonotope including the state
-        :param state -- numpy tuple
-        :param zonotope_mapping --  dict id->zonotope
-
-        :return id if find the zonotope else None。
-        """
-        for _, (center_vec, generate_matrix) in zonotope_mapping.items():
-            # 判断状态是否在zonotope内部
-            if is_in_zonotope(state, center_vec, generate_matrix):
-                return center_vec, generate_matrix
-        return zonotope_mapping[0]
-
     def update_egreed(self):
         """
         更新egreed
@@ -173,18 +112,14 @@ class ZonotopeAgent:
         """
         self.e_greedy = max(0.0001, self.e_greedy - 0.001)
 
-    def get_action(self, s0):
+    def get_action(self, abs_s0):
         """
         先判断zonotope编号
         神经网络输入zonotope然后得到线性
-        :param s0:
+        :param abs_s0:抽象状态
         :return:
         """
-        zonotope = self.find_zonotope(s0, self.zonotope_mapping)
-        c, g = zonotope
-        abs_s0 = np.append(c, g.flatten())
-        s0 = torch.tensor(abs_s0, dtype=torch.float).unsqueeze(0)
-        a0 = self.actor(s0).squeeze(0).detach().numpy()
+        a0 = self.actor(abs_s0).squeeze(0).detach().numpy()
         return a0
 
     def step(self):
@@ -195,19 +130,21 @@ class ZonotopeAgent:
         # 经验池回放
         if len(self.memory) < self.batch_size:
             return
-        p = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
-        print(p)
-        s0, a0, r, s1, _ = p
-        s0 = torch.tensor(s0, dtype=torch.float)
+        """
+        此时的memory是abs_s0, a0, r, s1, done 为一组，有很多组
+        我们需要的是把每一列作为一个数组
+        """
+        s0, a0, r, s1, _ = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
+        abs_s0 = torch.stack(s0, dim=0).squeeze(1)
         a0 = torch.tensor(a0, dtype=torch.float)
         r = torch.tensor(r, dtype=torch.float).view(self.batch_size, -1)
-        s1 = torch.tensor(s1, dtype=torch.float)
+        abs_s1 = torch.stack(s1, dim=0).squeeze(1)
 
         def _critic_learn():
-            a1 = self.target_actor(s1).detach()
-            y_true = r + self.gamma * self.target_critic(s1, a1).detach()
+            a1 = self.target_actor(abs_s1).detach()
+            y_true = r + self.gamma * self.target_critic(abs_s1, a1).detach()
 
-            y_pred = self.critic(s0, a0)
+            y_pred = self.critic(abs_s0, a0)
 
             loss = nn.MSELoss(y_pred, y_true)
 
@@ -216,7 +153,7 @@ class ZonotopeAgent:
             self.critic_optim.step()
 
         def _actor_learn():
-            loss = -torch.mean(self.critic(s0))
+            loss = -torch.mean(self.critic(abs_s0))
             self.actor_optim.zero_grad()
             loss.backward()
 
@@ -238,7 +175,7 @@ class ZonotopeAgent:
 
     def eval_model(self):
         """
-        TODO 评估一个模型
+        评估模型是否争取
         :return: 是否失败过
         """
         fail = 0
@@ -277,6 +214,7 @@ class ZonotopeAgent:
         self.logger.lazy_init_writer()
         for episode in range(self.num_episodes):
             s0 = self.env.reset()
+            abs_s0 = to_abstract(s0, self.zonotope_mapping)
             self.update_egreed()
             step_size = 0
             episode_reward = 0
@@ -284,12 +222,13 @@ class ZonotopeAgent:
                 if np.random.rand() < self.e_greedy:
                     a0 = [(np.random.rand() - 0.5) * 2]  # e_greedy 比较小的情况进行一定的探索
                 else:
-                    a0 = self.get_action(s0)
+                    a0 = self.get_action(abs_s0)
                 s1, r, done, _ = self.env.step(a0)
                 step_size += 1
-                self.memory.push(s0, a0, r, s1, done)
+                abs_s1 = to_abstract(s1,self.zonotope_mapping)
+                self.memory.push(abs_s0, a0, r, abs_s1, done)
                 episode_reward += r
-                s0 = s1
+                abs_s0 = abs_s1
                 if step % self.learn_iter:  # 更新
                     self.step()
 

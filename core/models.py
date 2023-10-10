@@ -43,7 +43,6 @@ class Actor(nn.Module):
         :return:
         """
         x = self.cal_coefficients(s[:, 0:self.input_size])
-
         tmp = s[:, self.input_size:]
         ones = torch.ones((tmp.size(0), 1))
         cat = torch.cat([ones, tmp], dim=-1)
@@ -53,8 +52,8 @@ class Actor(nn.Module):
 
     def cal_coefficients(self, s):
         """
-        生成神经网络的系数
-        :param s:
+        生成线性控制器的系数
+        :param s: 抽象状态
         :return:
         """
         x = self.model(s)

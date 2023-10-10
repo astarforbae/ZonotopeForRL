@@ -24,26 +24,21 @@
 
 ## TODO
 
-#### 实验
-
-- [ ] 实验接口
-- [ ] 
-
 #### 核心
 
 - [x] actor-critic
 
 - [x] ddpg算法
 
-- [ ] zonotope求解 （updating）
+- [x] zonotope求解 （updating）
 
 - [ ] Kdtree需要能够判断zonotope
 
 
 #### 工具
 
-- [ ] logger工具类 -> tensorboard
-- [ ] yaml 读取文件（updating）
+- [x] logger工具类 -> tensorboard
+- [x] yaml 读取文件（updating）
 - [ ] tensorboard包装类（updating）
 - [ ] config / json类配置（updating）
 
@@ -87,12 +82,32 @@
 
 9.4号更新：
 
-阅读Tyler1+和A2I，更改core，实现test
+- 阅读Tyler1+和A2I
+
+- 更改core
+- 实现test
 
 
 
 9.10号更新
 
 - 通过提高划分精度解决lineprog问题
-- 
-- 
+- 撰写工具类logger
+- 重装tensorflow，撰写tensorboard工具类
+
+
+
+9.24号更新
+
+- 更改为tensorboardX进行可视化
+- 完善logger类
+- fix bugs
+
+
+
+10.2/10.10更新
+
+- 训练
+- 完成模型评估
+
+- fix bugs
