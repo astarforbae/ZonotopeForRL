@@ -3,15 +3,24 @@
 #                                                                              #
 ################################################################################
 from scipy.spatial import cKDTree
+
+
 class KDTreeManager:
     """
     KDTree 建立索引
+    TODO
     """
-    def __init__(self, center_vec):
-        self.ckd_tree = cKDTree()
+
+    pass
+
 
 class DivideTools:
     """
     划分空间并且建立索引
+    通过divide tools来获得zonotope代表的抽象
     """
-    pass
+
+    def __init__(self):
+        """
+        """
+        pass
