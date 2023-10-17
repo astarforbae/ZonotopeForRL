@@ -3,7 +3,7 @@
 #                                agent.py                                      #
 #                                                                              #
 ################################################################################
-
+import torch
 from torch import nn, optim
 
 from utils.logger import *
@@ -134,28 +134,36 @@ class ZonotopeAgent:
         此时的memory是abs_s0, a0, r, s1, done 为一组，有很多组
         我们需要的是把每一列作为一个数组
         """
-        s0, a0, r, s1, _ = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
-        abs_s0 = torch.stack(s0, dim=0).squeeze(1)
+        s0, abs_s0, a0, r, s1, abs_s1, _ = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
+        s0 = torch.from_numpy(np.array(s0))
+        abs_s0 = torch.stack(abs_s0, dim=0).squeeze(1)
         a0 = torch.tensor(a0, dtype=torch.float)
         r = torch.tensor(r, dtype=torch.float).view(self.batch_size, -1)
-        abs_s1 = torch.stack(s1, dim=0).squeeze(1)
+        s1 = torch.from_numpy(np.array(s1))
+        abs_s1 = torch.stack(abs_s1, dim=0).squeeze(1)
+        concat_s0 = torch.cat([abs_s0, s0], dim=1).float()
+        concat_s1 = torch.cat([abs_s1, s1], dim=1).float()
 
         def _critic_learn():
             a1 = self.target_actor(abs_s1).detach()
-            y_true = r + self.gamma * self.target_critic(abs_s1, a1).detach()
+            y_true = r + self.gamma * self.target_critic(concat_s1, a1).detach()
 
-            y_pred = self.critic(abs_s0, a0)
-
-            loss = nn.MSELoss(y_pred, y_true)
+            y_pred = self.critic(concat_s0, a0)
+            loss_fn = nn.MSELoss()
+            loss = loss_fn(y_pred, y_true)
 
             self.critic_optim.zero_grad()
             loss.backward()
             self.critic_optim.step()
 
         def _actor_learn():
-            loss = -torch.mean(self.critic(abs_s0))
+            """
+            更新actor
+            """
+            loss = -torch.mean(self.critic(concat_s0, self.actor(abs_s0)))
             self.actor_optim.zero_grad()
             loss.backward()
+            self.actor_optim.step()
 
         def _soft_update(net_target, net, tau):
             """
@@ -225,8 +233,8 @@ class ZonotopeAgent:
                     a0 = self.get_action(abs_s0)
                 s1, r, done, _ = self.env.step(a0)
                 step_size += 1
-                abs_s1 = to_abstract(s1,self.zonotope_mapping)
-                self.memory.push(abs_s0, a0, r, abs_s1, done)
+                abs_s1 = to_abstract(s1, self.zonotope_mapping)
+                self.memory.push(s0, abs_s0, a0, r, s1, abs_s1, done)
                 episode_reward += r
                 abs_s0 = abs_s1
                 if step % self.learn_iter:  # 更新
@@ -238,7 +246,7 @@ class ZonotopeAgent:
                 self.save()
             self.reward_list.append(episode_reward)
             self.logger.info(f'Episode: {episode}, Cumulative_Reward: {episode_reward}')
-            self.logger.add_scalar('Cumulative Reward', episode_reward, episode)
+            self.logger.add_scalar('Cumulative_Reward', episode_reward, episode)
 
             if terminate_pre and episode >= 500:
                 res = self.eval_model()
