@@ -3,9 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class BasicActor(nn.Module):
+    """
+    Deep Deterministic Policy Gradient (DDPG) for Basic train - Actor
+    """
+    pass
+
+
 class Actor(nn.Module):
     """
-    Deep Deterministic Policy Gradient (DDPG) - Actor
+    Deep Deterministic Policy Gradient (DDPG) for Abstract train - Actor
     :param 
     """
 

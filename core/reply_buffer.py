@@ -7,10 +7,13 @@ class ReplayBuffer:
         self.buffer = []
         self.position = 0
 
-    def push(self, state, action, reward, next_state, done):
+    def push(self, state, abs_state, action, reward, next_state, next_abs, done):
+        """
+
+        """
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
-        self.buffer[self.position] = (state, action, reward, next_state, done)
+        self.buffer[self.position] = (state, abs_state, action, reward, next_state, next_abs, done)
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
