@@ -17,12 +17,12 @@ class BasicActor(nn.Module):
         # network arch
         layers = [
             nn.Linear(input_size, hidden_size),
-            nn.Tanh()
+            nn.ReLU()
         ]
         for _ in range(num_hidden):
             layers.extend([
                 nn.Linear(hidden_size, hidden_size),
-                nn.Tanh()
+                nn.ReLU()
             ])
         layers.append(nn.Linear(hidden_size, output_size))
         self.model = nn.Sequential(*layers)
