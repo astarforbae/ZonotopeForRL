@@ -8,7 +8,7 @@ from torch import nn, optim
 
 from utils.logger import *
 from utils.misc import get_default_pt_dir
-from .models import Actor, Critic
+from .models import Actor, Critic, BasicActor
 from .reply_buffer import ReplayBuffer
 from .zonotope import generate_zonotope_mapping, to_abstract
 
@@ -58,6 +58,7 @@ class ZonotopeAgent:
         # actor critic
         self.s_dim = env.observation_space.shape[0]
         self.a_dim = env.action_space.shape[0]
+        self.a_bound = [env.action_space.low, env.action_space.high]
         # the input size is the sum of center vec and generate_matrix
         if is_abstract:
             actor_input_size = self.s_dim * self.s_dim + self.s_dim
@@ -65,8 +66,10 @@ class ZonotopeAgent:
             actor_input_size = self.s_dim
         # the output size
         actor_output_size = self.a_dim
-        self.actor = Actor(actor_input_size, hidden_layer_size, actor_output_size)
-        self.target_actor = Actor(actor_input_size, hidden_layer_size, actor_output_size)
+        # self.actor = Actor(actor_input_size, hidden_layer_size, actor_output_size)
+        # self.target_actor = Actor(actor_input_size, hidden_layer_size, actor_output_size)
+        self.actor = BasicActor(actor_input_size, hidden_layer_size, actor_output_size, self.a_bound)
+        self.target_actor = BasicActor(actor_input_size, hidden_layer_size, actor_output_size, self.a_bound)
         self.actor_optim = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
         if is_abstract:
             critic_input_size = actor_input_size + self.s_dim + self.a_dim
@@ -273,4 +276,3 @@ class ZonotopeAgent:
                 res = self.eval_model()
                 print(res)
                 return
-

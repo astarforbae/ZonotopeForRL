@@ -10,11 +10,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == '__main__':
     # 环境列表
-    env_list = ["Pendulum-v0"]
+    env_list = ["Pendulum-v0", "CartPole-v1"]
     # 环境
     model_list = ["triangle", "zonotope"]
 
-    print(os.path.split(os.path.realpath(__file__))[0])
     parser = argparse.ArgumentParser(description="linear-control")
     parser.add_argument('--model', type=str, default="zonotope", help='type of model', choices=model_list)
     parser.add_argument('--env_name', type=str, default='Pendulum-v0', help='name of donkey sim environment',

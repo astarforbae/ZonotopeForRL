@@ -7,7 +7,36 @@ class BasicActor(nn.Module):
     """
     Deep Deterministic Policy Gradient (DDPG) for Basic train - Actor
     """
-    pass
+
+    def __init__(self, input_size, hidden_size, output_size, action_bound, num_hidden=4):
+        super(BasicActor, self).__init__()
+        larger_weight = 1
+        self.input_size = input_size
+        self.output_size = output_size
+        self.action_bound = action_bound
+        # network arch
+        layers = [
+            nn.Linear(input_size, hidden_size),
+            nn.Tanh()
+        ]
+        for _ in range(num_hidden):
+            layers.extend([
+                nn.Linear(hidden_size, hidden_size),
+                nn.Tanh()
+            ])
+        layers.append(nn.Linear(hidden_size, output_size))
+        self.model = nn.Sequential(*layers)
+        for layer in self.model:
+            if isinstance(layer, nn.Linear):
+                layer.weight.data.normal_(0, larger_weight)
+                layer.bias.data.zero_()
+
+    def forward(self, x):
+        """
+        No abstraction
+        """
+        action_range = torch.from_numpy(self.action_bound[1] - self.action_bound[0])
+        return torch.tanh(self.model(x)) * action_range
 
 
 class Actor(nn.Module):
@@ -24,7 +53,7 @@ class Actor(nn.Module):
         # network arch
         layers = [
             nn.Linear(input_size, hidden_size),
-            nn.ReLU()
+            nn.Tanh()
         ]
 
         for _ in range(num_hidden):
