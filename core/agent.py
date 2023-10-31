@@ -8,7 +8,7 @@ from torch import nn, optim
 
 from utils.logger import *
 from utils.misc import get_default_pt_dir
-from .models import Actor, Critic, BasicActor
+from .models import Actor, Critic, BasicActor, OUNoise
 from .reply_buffer import ReplayBuffer
 from .zonotope import generate_zonotope_mapping, to_abstract
 
@@ -21,17 +21,16 @@ class ZonotopeAgent:
     def __init__(self,
                  env,
                  num_interval=10,
-                 num_episodes=6000,
-                 max_steps=15000,
-                 actor_lr=0.001,
-                 critic_lr=0.001,
-                 gamma=0.99,
-                 tau=0.001,
-                 hidden_layer_size=400,
+                 num_episodes=1500,
+                 max_steps=2000,
+                 actor_lr=1e-3,
+                 critic_lr=1e-2,
+                 gamma=0.98,
+                 tau=0.005,
+                 hidden_layer_size=64,
                  e_greedy=0.5,
-                 discount_factor=0.99,
-                 replay_capacity=100000,
-                 memory_warmup_size=5000,
+                 replay_capacity=10000,
+                 memory_warmup_size=50,
                  batch_size=32,
                  learn_iter=10,
                  save_iter=16,
@@ -46,7 +45,6 @@ class ZonotopeAgent:
         self.gamma = gamma
         self.tau = tau
         self.e_greedy = e_greedy
-        self.discount_factor = discount_factor
         self.num_episodes = num_episodes
         self.replay_capacity = replay_capacity
         self.memory_warmup_size = memory_warmup_size
@@ -84,6 +82,8 @@ class ZonotopeAgent:
         self.critic = Critic(critic_input_size, hidden_layer_size, critic_output_size)
         self.target_critic = Critic(critic_input_size, hidden_layer_size, critic_output_size)
         self.critic_optim = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
+        # add ou noise
+        self.ou_noise = OUNoise(self.a_dim)
         # zonotope 划分
         self.zonotope_mapping = generate_zonotope_mapping(env.observation_space, num_interval)
         # TODO: divide_tools
@@ -136,8 +136,8 @@ class ZonotopeAgent:
         :param abs_s0:抽象状态
         :return:
         """
-        a0 = self.actor(abs_s0).squeeze(0).detach().numpy()
-        return a0
+        a0 = self.actor(abs_s0).squeeze(0).detach()
+        return a0.numpy() + self.ou_noise.sample()
 
     def step(self):
         """
@@ -151,7 +151,7 @@ class ZonotopeAgent:
         此时的memory是abs_s0, a0, r, s1, done 为一组，有很多组
         我们需要的是把每一列作为一个数组
         """
-        s0, abs_s0, a0, r, s1, abs_s1, _ = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
+        s0, abs_s0, a0, r, s1, abs_s1, done = tuple([list(col) for col in zip(*self.memory.sample(self.batch_size))])
         s0 = torch.from_numpy(np.array(s0)).float()
         abs_s0 = torch.stack(abs_s0, dim=0).squeeze(1)
         a0 = torch.tensor(a0, dtype=torch.float)
@@ -249,19 +249,22 @@ class ZonotopeAgent:
         for episode in range(self.num_episodes):
             s0 = self.env.reset()
             # abs_s0 = to_abstract(s0, self.zonotope_mapping)
+            self.ou_noise.reset()  # init noise
             abs_s0 = torch.rand(self.abs_s_dim)
             self.update_egreed()
             step_size = 0
             episode_reward = 0
             for step in range(self.max_steps):
-                if np.random.rand() < self.e_greedy:
-                    a0 = [(np.random.rand() - 0.5) * 2]  # e_greedy 比较小的情况进行一定的探索
-                else:
-                    if self.is_abstract:
-                        a0 = self.get_action(abs_s0)
-                    else:
-                        torch_s0 = torch.from_numpy(s0).float().unsqueeze(0)
-                        a0 = self.get_action(torch_s0)
+                # if np.random.rand() < self.e_greedy:
+                #     a0 = [(np.random.rand() - 0.5) * 2]  # e_greedy 比较小的情况进行一定的探索
+                # else:
+                # if self.is_abstract:
+                #     a0 = self.get_action(abs_s0)
+                # else:
+                #     torch_s0 = torch.from_numpy(s0).float().unsqueeze(0)
+                #     a0 = self.get_action(torch_s0)
+                torch_s0 = torch.from_numpy(s0).float().unsqueeze(0)
+                a0 = self.get_action(torch_s0)
                 s1, r, done, _ = self.env.step(a0)
                 step_size += 1
                 # abs_s1 = to_abstract(s1, self.zonotope_mapping)
@@ -269,14 +272,14 @@ class ZonotopeAgent:
                 self.memory.push(s0, abs_s0, a0, r, s1, abs_s1, done)
                 episode_reward += r
                 # abs_s0 = abs_s1
-                if step % self.learn_iter:  # 更新
+                if step % self.learn_iter == 0:  # 更新
                     self.step()
 
                 if done:  # 结束一个轮次
                     break
 
-            if episode % self.save_iter == 0:
-                self.save()
+            # if episode % self.save_iter == 0:
+            # self.save()
             self.reward_list.append(episode_reward)
             self.logger.info(f'Episode: {episode}, Cumulative_Reward: {episode_reward}, Step_size:{step_size}')
             self.logger.add_scalar('Cumulative_Reward', episode_reward, episode)
