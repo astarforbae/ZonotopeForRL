@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="linear-control")
     parser.add_argument('--model', type=str, default="zonotope", help='type of model', choices=model_list)
-    parser.add_argument('--env_name', type=str, default='CartPoleContinuous', help='name of donkey sim environment',
+    parser.add_argument('--env_name', type=str, default='Pendulum-v0', help='name of donkey sim environment',
                         choices=env_list)
     parser.add_argument('--render_mode', type=str, default='human', help='render method', choices=['human'])
 

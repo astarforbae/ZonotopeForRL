@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+
 
 class BasicActor(nn.Module):
     """
@@ -10,7 +12,7 @@ class BasicActor(nn.Module):
 
     def __init__(self, input_size, hidden_size, output_size, action_bound, num_hidden=4):
         super(BasicActor, self).__init__()
-        larger_weight = 1
+        larger_weight = 0.3
         self.input_size = input_size
         self.output_size = output_size
         self.action_bound = action_bound
@@ -35,7 +37,7 @@ class BasicActor(nn.Module):
         """
         No abstraction
         """
-        action_range = torch.from_numpy(self.action_bound[1] - self.action_bound[0])
+        action_range = torch.from_numpy(self.action_bound[1])
         return torch.tanh(self.model(x)) * action_range
 
 
@@ -119,3 +121,25 @@ class Critic(nn.Module):
         x = F.relu(self.linear3(x))
         x = self.linear4(x)
         return x
+
+
+class OUNoise:
+    def __init__(self, size, mu=0.0, theta=0.15, sigma=0.1):
+        """Initialize parameters and noise process."""
+        self.state = None
+        self.mu = mu * np.ones(size)
+        self.theta = theta
+        self.sigma = sigma
+        self.size = size
+        self.reset()
+
+    def reset(self):
+        """Reset the internal state (= noise) to mean (mu)."""
+        self.state = np.copy(self.mu)
+
+    def sample(self):
+        """Update internal state and return it as a noise sample."""
+        x = self.state
+        dx = self.theta * (self.mu - x) + self.sigma * np.random.randn(self.size)
+        self.state = x + dx
+        return self.state
