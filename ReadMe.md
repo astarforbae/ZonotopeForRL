@@ -1,24 +1,83 @@
-# Zonotope
+# ZonotopeForRL
 
-## 实验内容
+## 目录
 
-核心思路：
+[TOC]
 
--  起始阶段将状态空间划分成不同的zonotope
-  - 需要`divide_tools`进行某种划分
-  - zonotope 两个字段`center_vec`和`generate_matrix`
-  - center_vec控制zonotope位置，generate_matrix控制zonotope的形状
-  - 需要Kdtree或者rtree？进行存储
-- 神经网络接受zonotope为输入，输出线性控制器系数
-  - 神经网络actor-critic结构
-  - 输出系数通过向量乘法运算
+## 项目概述
 
-- 更新采用`ddpg`算法进行更新
+本项目旨在使用抽象强化学习来实现可验证的强化学习。下图是我们的核心流程图：
 
-  - 弄清楚ddpg原理
-  - 实现策略梯度上升更新
+![Core progress](https://typora-yy.oss-cn-hangzhou.aliyuncs.com/Typora-img/architection.png)
 
-  
+1. 环境状态`state`所在空间被称为环境状态空间`state_space`, 初始化时，核心模块`ZonotopeUtils`会将`state_space`划分为多个`zonotope`子空间，`state`输入`ZonotopeUtils`后查询`zonotope`集合，找到所属的`zonotope`，将(`state`,`center_vec`和`generator matrix`)组成`abs_state`
+   - 注：zonotope是高维平行四边形，由关于zonotope的形式化定义请见下图：
+     ![[Niklas Kochdumper, 2022] ](https://typora-yy.oss-cn-hangzhou.aliyuncs.com/Typora-img/image-20231107112301574.png)
+2. 将`abs_state`输入DDPG算法训练的`Actor`和`Critic`中,最终输出动作`action`
+   - `Actor`类似一个超网络，`Actor`类**主体是一个神经网络，输入一组抽象状态`abs_state`,输出一组线性控制器`LinearControl`的参数，输出的线性控制器，再与抽象状态进行点乘运算，输出动作**
+   - `Critic`与普通的DDPG算法的Critic没有太大区别，主要功能判断`action`是否良好
+
+
+
+## 架构
+
+```
+C:.
+|   .gitignore                 # 丢弃无关文件
+|   main.py 				   # 启动类
+|   ReadMe.md                  # 主要文档
+|   requirements.txt           # 依赖包
+|   tensorboard.bat			   # 用于启动tensorboard的
+|
++---core				# 核心包
+|   |   agent.py               # 与环境直接交互的agent       
+|   |   models.py			   # DDPG的Actor和Critic
+|   |   reply_buffer.py        # Reply_Buffer 用于经验再现
+|   |   train.py			   # 训练脚本
+|   |   zonotope.py			   # Zonotope_utils类
+|   |   __init__.py            
+|   |
+|   +---config
+|   |       zonotope.yaml      # zonotope参数配置（TODO）
++---env 
+|      cartpole_continuous.py  #连续状态空间的cartpole环境
+|      __init__.py             
+|
+\---utils
+    |   config.py              # 全局参数类
+    |   logger.py			   # 日志类
+    |   misc.py				   # 杂项
+    |   read_yaml.py           # 读取yaml文件（TODO）
+    |   torch_utils.py         # torch工具
+    |   __init__.py
+    |
+```
+
+
+
+## 如何开始
+
+如果你想使用本项目，先：
+
+```bat
+git clone https://github.com/yy6768/ZonotopeForRL.git
+```
+
+使用pip：
+
+```bat
+pip install -r requirements.txt
+```
+
+使用conda:
+
+```bat
+conda install --file requirements.txt
+```
+
+
+
+
 
 
 
@@ -57,106 +116,6 @@
 
 ### 实验
 
-- [ ] 倒立摆（updating)
-
-
-## 更新日志
-
-### 8月14号更新
-
-初始化仓库
-
-### 8月21号更新
-
-[update utils by yy6768 · Pull Request #1 · yy6768/ZonotopeForRL (github.com)](https://github.com/yy6768/ZonotopeForRL/pull/1)
-
-### 8月30号更新
-
-8月28号issue：
-
-状态空间权重无法动态实现；zonotope仍然有none的情况
-
-8月30号：
-
-现在可以正常运行，但是离完整实现还差很多
-
-
-
-### 9.4号更新：
-
-- 阅读Tyler1+和A2I
-
-- 更改core
-- 更新test
-
-
-
-### 9.10号更新
-
-- 通过提高划分精度解决lineprog问题
-- 撰写工具类logger
-- 重装tensorflow，撰写tensorboard工具类
-
-
-
-### 9.24号更新
-
-- 更改为tensorboardX进行可视化
-- 完善logger类
-- fix bugs
-
-
-
-### 10.2/10.10更新
-
-- 训练
-- 完成模型评估
-
-- fix bugs
-
-### 10.17更新 
-
-- 10.14/10.17训练效果不好进行调整
-
-### 10.17-10.26日更新
-
-**工作内容：**
-
-1. 在Pendulum环境上进行了消融实验。
-2. 实验中移除了**抽象状态（zonotope）**。
-3. 保留了使用DDPG生成的线性控制器策略。
-4. 在多组超参数进行实验，实验效果不好
-
-**实验结果：**
-
-结果不理想，获得的奖励范围为-1600到-1000。
-
-### 10.26-10.31日更新
-
-**工作内容：**
-
-1. 创建了新的环境。
-2. 实验中添加了Ornstein-Uhlenbeck (OU) 噪声。
-3. 引入了`Animator`以便于可视化。
-4. 移除了抽象状态和线性控制器生成策略。
-5. 对超参数进行了多次调整。
-
-**实验结果：**
-
-- 与上一周相比，训练结果有明显的好转趋势。
-- 尽管如此，仍然出现了过拟合的情况。
-
-week13-14**实验数据**：
-
-| Experiment # | 抽象状态 | 线性控制器 | OU 噪声 | 最高奖励 | 最低奖励 | 注释        |
-| ------------ | -------- | ---------- | ------- | -------- | -------- | ----------- |
-| 1            | ❌        | ✅          | ❌       | -1600    | -1000    | Week 13实验 |
-| 2            | ❌        | ❌          | ✅       | -xxxx    | -xxxx    | Week 14实验 |
-| ...          | ...      | ...        | ...     | ...      | ...      | ...         |
-
-下一步计划/建议：
-
-1. **调试与优化**：尝试把调优的参数和模型放在抽象域上进行实验
-2. **防止过拟合/正则化**：考虑引入dropout或其他正则化策略来防止过拟合
-3. 实验数据调整
+- [x] 倒立摆Pendulum（updating)
+- [ ] 
 
